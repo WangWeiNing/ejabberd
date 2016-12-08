@@ -459,20 +459,20 @@ process_item_els(Item, [{xmlcdata, _} | Els]) ->
 process_item_els(Item, []) -> Item.
 
 push_item(User, Server, From, Item) ->
-    ejabberd_sm:route(jid:make(<<"">>, <<"">>, <<"">>),
-		      jid:make(User, Server, <<"">>),
-                      {broadcast, {item, Item#roster.jid,
-				   Item#roster.subscription}}),
-    case roster_versioning_enabled(Server) of
-      true ->
-	  push_item_version(Server, User, From, Item,
-			    roster_version(Server, User));
-      false ->
-	  lists:foreach(fun (Resource) ->
-				push_item(User, Server, Resource, From, Item)
-			end,
-			ejabberd_sm:get_user_resources(User, Server))
-    end.
+  ejabberd_sm:route(jid:make(<<"">>, <<"">>, <<"">>),
+    jid:make(User, Server, <<"">>),
+    {broadcast, {item, Item#roster.jid,
+      Item#roster.subscription}}),
+  case roster_versioning_enabled(Server) of
+    true ->
+      push_item_version(Server, User, From, Item,
+        roster_version(Server, User));
+    false ->
+      lists:foreach(fun (Resource) ->
+        push_item(User, Server, Resource, From, Item)
+                    end,
+        ejabberd_sm:get_user_resources(User, Server))
+  end.
 
 push_item(User, Server, Resource, From, Item) ->
     push_item(User, Server, Resource, From, Item,
@@ -548,81 +548,87 @@ get_roster_by_jid_with_groups_t(LUser, LServer, LJID) ->
     Mod:get_roster_by_jid_with_groups(LUser, LServer, LJID).
 
 process_subscription(Direction, User, Server, JID1,
-		     Type, Reason) ->
-    LUser = jid:nodeprep(User),
-    LServer = jid:nameprep(Server),
-    LJID = jid:tolower(JID1),
-    F = fun () ->
-		Item = get_roster_by_jid_with_groups_t(LUser, LServer,
-						       LJID),
-		NewState = case Direction of
-			     out ->
-				 out_state_change(Item#roster.subscription,
-						  Item#roster.ask, Type);
-			     in ->
-				 in_state_change(Item#roster.subscription,
-						 Item#roster.ask, Type)
-			   end,
-		AutoReply = case Direction of
-			      out -> none;
-			      in ->
-				  in_auto_reply(Item#roster.subscription,
-						Item#roster.ask, Type)
-			    end,
-		AskMessage = case NewState of
-			       {_, both} -> Reason;
-			       {_, in} -> Reason;
-			       _ -> <<"">>
-			     end,
-		case NewState of
-		  none -> {none, AutoReply};
-		  {none, none}
-		      when Item#roster.subscription == none,
-			   Item#roster.ask == in ->
-		      del_roster_t(LUser, LServer, LJID), {none, AutoReply};
-		  {Subscription, Pending} ->
-		      NewItem = Item#roster{subscription = Subscription,
-					    ask = Pending,
-					    askmessage =
-						iolist_to_binary(AskMessage)},
-		      roster_subscribe_t(LUser, LServer, LJID, NewItem),
-		      case roster_version_on_db(LServer) of
-			true -> write_roster_version_t(LUser, LServer);
-			false -> ok
-		      end,
-		      {{push, NewItem}, AutoReply}
-		end
-	end,
-    case transaction(LServer, F) of
-      {atomic, {Push, AutoReply}} ->
-	  case AutoReply of
-	    none -> ok;
-	    _ ->
-		T = case AutoReply of
-		      subscribed -> <<"subscribed">>;
-		      unsubscribed -> <<"unsubscribed">>
-		    end,
-		ejabberd_router:route(jid:make(User, Server,
-						    <<"">>),
-				      JID1,
-				      #xmlel{name = <<"presence">>,
-					     attrs = [{<<"type">>, T}],
-					     children = []})
-	  end,
-	  case Push of
-	    {push, Item} ->
-		if Item#roster.subscription == none,
-		   Item#roster.ask == in ->
-		       ok;
-		   true ->
-		       push_item(User, Server,
-				 jid:make(User, Server, <<"">>), Item)
-		end,
-		true;
-	    none -> false
-	  end;
-      _ -> false
-    end.
+  Type, Reason) ->
+  LUser = jid:nodeprep(User),
+  LServer = jid:nameprep(Server),
+  LJID = jid:tolower(JID1),
+  F = fun () ->
+    Item = get_roster_by_jid_with_groups_t(LUser, LServer,
+      LJID),
+    NewState = case Direction of
+                 out ->
+                   out_state_change(Item#roster.subscription,
+                     Item#roster.ask, Type);
+                 in ->
+                   in_state_change(Item#roster.subscription,
+                     Item#roster.ask, Type)
+               end,
+    AutoReply = case Direction of
+                  out -> none;
+                  in ->
+                    in_auto_reply(Item#roster.subscription,
+                      Item#roster.ask, Type)
+                end,
+    AskMessage = case NewState of
+                   {_, both} -> Reason;
+                   {_, in} -> Reason;
+                   _ -> <<"">>
+                 end,
+    case NewState of
+      none -> {none, AutoReply};
+      {none, none}
+        when Item#roster.subscription == none, Item#roster.ask == in ->
+        del_roster_t(LUser, LServer, LJID),
+        {none, AutoReply};
+      {Subscription, Pending} ->
+        NewItem = Item#roster{
+          subscription = Subscription,
+          ask = Pending,
+          askmessage = iolist_to_binary(AskMessage)
+        },
+        roster_subscribe_t(LUser, LServer, LJID, NewItem),
+        case roster_version_on_db(LServer) of
+          true ->
+            write_roster_version_t(LUser, LServer);
+          false ->
+            ok
+        end,
+        {{push, NewItem}, AutoReply}
+    end
+      end,
+  case transaction(LServer, F) of
+    {atomic, {Push, AutoReply}} ->
+      case AutoReply of
+        none -> ok;
+        _ ->
+          T = case AutoReply of
+                subscribed ->
+                  <<"subscribed">>;
+                unsubscribed ->
+                  <<"unsubscribed">>
+              end,
+          ejabberd_router:route(jid:make(User, Server,
+            <<"">>),
+            JID1,
+            #xmlel{name = <<"presence">>,
+              attrs = [{<<"type">>, T}],
+              children = []
+            })
+      end,
+      case Push of
+        {push, Item} ->
+          if Item#roster.subscription == none, Item#roster.ask == in ->
+              ok;
+            true ->
+              push_item(User, Server, jid:make(User, Server, <<"">>), Item)
+          end,
+          true;
+        none ->
+          false
+      end;
+    _ ->
+      false
+  end.
 
 %% in_state_change(Subscription, Pending, Type) -> NewState
 %% NewState = none | {NewSubscription, NewPending}
@@ -645,7 +651,7 @@ in_state_change(none, none, subscribed) -> ?NNSD;
 in_state_change(none, none, unsubscribe) -> none;
 in_state_change(none, none, unsubscribed) -> none;
 in_state_change(none, out, subscribe) -> {none, both};
-in_state_change(none, out, subscribed) -> {to, none};
+in_state_change(none, out, subscribed) -> {both, none};
 in_state_change(none, out, unsubscribe) -> none;
 in_state_change(none, out, unsubscribed) ->
     {none, none};
@@ -693,7 +699,7 @@ out_state_change(none, out, unsubscribe) ->
     {none, none};
 out_state_change(none, out, unsubscribed) -> none;
 out_state_change(none, in, subscribe) -> {none, both};
-out_state_change(none, in, subscribed) -> {from, none};
+out_state_change(none, in, subscribed) -> {both, none};
 out_state_change(none, in, unsubscribe) -> none;
 out_state_change(none, in, unsubscribed) ->
     {none, none};

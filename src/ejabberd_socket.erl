@@ -74,55 +74,55 @@
 -spec start(atom(), sockmod(), socket(), [{atom(), any()}]) -> any().
 
 start(Module, SockMod, Socket, Opts) ->
-    case Module:socket_type() of
-      xml_stream ->
-	  MaxStanzaSize = case lists:keysearch(max_stanza_size, 1,
-					       Opts)
-			      of
-			    {value, {_, Size}} -> Size;
-			    _ -> infinity
-			  end,
-	  {ReceiverMod, Receiver, RecRef} = case catch
-						   SockMod:custom_receiver(Socket)
-						of
-					      {receiver, RecMod, RecPid} ->
-						  {RecMod, RecPid, RecMod};
-					      _ ->
-						  RecPid =
-						      ejabberd_receiver:start(Socket,
-									      SockMod,
-									      none,
-									      MaxStanzaSize),
-						  {ejabberd_receiver, RecPid,
-						   RecPid}
-					    end,
-	  SocketData = #socket_state{sockmod = SockMod,
-				     socket = Socket, receiver = RecRef},
-	  case Module:start({?MODULE, SocketData}, Opts) of
-	    {ok, Pid} ->
-		case SockMod:controlling_process(Socket, Receiver) of
-		  ok -> ok;
-		  {error, _Reason} -> SockMod:close(Socket)
-		end,
-		ReceiverMod:become_controller(Receiver, Pid);
-	    {error, _Reason} ->
-		SockMod:close(Socket),
-		case ReceiverMod of
-		  ejabberd_receiver -> ReceiverMod:close(Receiver);
-		  _ -> ok
-		end
-	  end;
-      independent -> ok;
-      raw ->
-	  case Module:start({SockMod, Socket}, Opts) of
-	    {ok, Pid} ->
-		case SockMod:controlling_process(Socket, Pid) of
-		  ok -> ok;
-		  {error, _Reason} -> SockMod:close(Socket)
-		end;
-	    {error, _Reason} -> SockMod:close(Socket)
-	  end
-    end.
+  case Module:socket_type() of
+    xml_stream ->
+      MaxStanzaSize = case lists:keysearch(max_stanza_size, 1,
+        Opts)
+                      of
+                        {value, {_, Size}} -> Size;
+                        _ -> infinity
+                      end,
+      {ReceiverMod, Receiver, RecRef} = case catch
+        SockMod:custom_receiver(Socket)
+                                        of
+                                          {receiver, RecMod, RecPid} ->
+                                            {RecMod, RecPid, RecMod};
+                                          _ ->
+                                            RecPid =
+                                              ejabberd_receiver:start(Socket,
+                                                SockMod,
+                                                none,
+                                                MaxStanzaSize),
+                                            {ejabberd_receiver, RecPid,
+                                              RecPid}
+                                        end,
+      SocketData = #socket_state{sockmod = SockMod,
+        socket = Socket, receiver = RecRef},
+      case Module:start({?MODULE, SocketData}, Opts) of
+        {ok, Pid} ->
+          case SockMod:controlling_process(Socket, Receiver) of
+            ok -> ok;
+            {error, _Reason} -> SockMod:close(Socket)
+          end,
+          ReceiverMod:become_controller(Receiver, Pid);
+        {error, _Reason} ->
+          SockMod:close(Socket),
+          case ReceiverMod of
+            ejabberd_receiver -> ReceiverMod:close(Receiver);
+            _ -> ok
+          end
+      end;
+    independent -> ok;
+    raw ->
+      case Module:start({SockMod, Socket}, Opts) of
+        {ok, Pid} ->
+          case SockMod:controlling_process(Socket, Pid) of
+            ok -> ok;
+            {error, _Reason} -> SockMod:close(Socket)
+          end;
+        {error, _Reason} -> SockMod:close(Socket)
+      end
+  end.
 
 connect(Addr, Port, Opts) ->
     connect(Addr, Port, Opts, infinity).

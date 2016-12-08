@@ -16,7 +16,7 @@
 start(Host, Opts) ->
 	FilePath = proplists:get_value(words_file, Opts),	
 	ejabberd_hooks:add(user_send_packet, Host, ?MODULE, filter_word, 1),
-	filter_word:start({local, word_filter}, 8, FilePath),
+	filter_word:start(word_filter, 8, FilePath),
 	?INFO_MSG("Hello. ejabberd world!", []),
 	ok.
 

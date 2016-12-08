@@ -220,6 +220,7 @@ set_settings_from_config() ->
 start_apps() ->
     crypto:start(),
     ejabberd:start_app(sasl),
+    ejabberd:start_app(filter_word),
     ejabberd:start_app(ssl),
     ejabberd:start_app(fast_yaml),
     ejabberd:start_app(fast_tls),

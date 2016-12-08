@@ -180,33 +180,33 @@ handle_cast(_Msg, State) ->
     {noreply, State, ?HIBERNATE_TIMEOUT}.
 
 handle_info({Tag, _TCPSocket, Data},
-	    #state{socket = Socket, sock_mod = SockMod} = State)
-    when (Tag == tcp) or (Tag == ssl) or
-	   (Tag == ejabberd_xml) ->
-    case SockMod of
-      fast_tls ->
-	  case fast_tls:recv_data(Socket, Data) of
-	    {ok, TLSData} ->
-		{noreply, process_data(TLSData, State),
-		 ?HIBERNATE_TIMEOUT};
-	    {error, Reason} ->
-		  if is_binary(Reason) ->
-			  ?DEBUG("TLS error = ~s", [Reason]);
-		     true ->
-			  ok
-		  end,
-		  {stop, normal, State}
-	  end;
-      ezlib ->
-	  case ezlib:recv_data(Socket, Data) of
-	    {ok, ZlibData} ->
-		{noreply, process_data(ZlibData, State),
-		 ?HIBERNATE_TIMEOUT};
-	    {error, _Reason} -> {stop, normal, State}
-	  end;
-      _ ->
-	  {noreply, process_data(Data, State), ?HIBERNATE_TIMEOUT}
-    end;
+  #state{socket = Socket, sock_mod = SockMod} = State)
+  when (Tag == tcp) or (Tag == ssl) or
+  (Tag == ejabberd_xml) ->
+  case SockMod of
+    fast_tls ->
+      case fast_tls:recv_data(Socket, Data) of
+        {ok, TLSData} ->
+          {noreply, process_data(TLSData, State),
+            ?HIBERNATE_TIMEOUT};
+        {error, Reason} ->
+          if is_binary(Reason) ->
+            ?DEBUG("TLS error = ~s", [Reason]);
+            true ->
+              ok
+          end,
+          {stop, normal, State}
+      end;
+    ezlib ->
+      case ezlib:recv_data(Socket, Data) of
+        {ok, ZlibData} ->
+          {noreply, process_data(ZlibData, State),
+            ?HIBERNATE_TIMEOUT};
+        {error, _Reason} -> {stop, normal, State}
+      end;
+    _ ->
+      {noreply, process_data(Data, State), ?HIBERNATE_TIMEOUT}
+  end;
 handle_info({Tag, _TCPSocket}, State)
     when (Tag == tcp_closed) or (Tag == ssl_closed) ->
     {stop, normal, State};
